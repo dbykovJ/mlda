@@ -7,7 +7,9 @@ authors = [
     { name = "lorenzHeinrich", email = "lorenz.heinrich@student.kit.edu" }
 ]
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "pynput>=1.8.2",
+]
 
 [project.scripts]
 keydynamics = "keydynamics:main"
