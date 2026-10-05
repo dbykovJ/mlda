@@ -1,9 +1,18 @@
+import time
+
 from pynput import keyboard
 
 
 class Keylistener:
+
+    def __init__(self, dataGenerator):
+        self.dataGenerator = dataGenerator
+
+
     def on_press(self, key):
         print(f"registering key {key}")
+        self.dataGenerator.register(key, time.time())
+
 
     def on_release(self, key):
         print(f"releasing {key}")
