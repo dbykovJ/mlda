@@ -28,7 +28,7 @@ def main() -> None:
     session_id = get_session_id(args.output_path)
 
     memory = Queue()
-    dataGenerator = DataGenerator(session_id=session_id, participant_id=args.participant_id, memory=memory)
+    dataGenerator = DataGenerator(session_id=session_id, participant_id=args.participant_id, memory=memory, session_timeout=args.session_timeout)
     keyListener = KeyListener(dataGenerator)
     keyListener.listen()
 
