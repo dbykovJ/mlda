@@ -1,3 +1,4 @@
+import csv
 from queue import Queue
 import argparse
 import os
@@ -8,7 +9,7 @@ from keydynamics.datagenerator import DataGenerator
 
 from keydynamics.parser import parserSetup
 
-def get_session_id(output_path: str):
+def get_session_id(output_path: str) -> int:
     list_of_files = glob.glob(output_path + '/*.csv')
     if not list_of_files:
         latest_file = output_path + "/keydynamics.csv"
@@ -31,7 +32,6 @@ def main() -> None:
     dataGenerator = DataGenerator(session_id=session_id, participant_id=args.participant_id, memory=memory, session_timeout=args.session_timeout)
     keyListener = KeyListener(dataGenerator)
     keyListener.listen()
-
 
 if __name__ == "__main__":
     main()

@@ -32,8 +32,8 @@ class KeyListener:
             key_code=key_code(key), timestamp=time.time(), key=key_char(key)
         )
 
-    def listen(self):
-        print("listeing to keys...")
+    def listen(self) -> None:
+        print("Listening to keys...")
         with keyboard.Listener(
             on_press=self.on_press, on_release=self.on_release
         ) as listener:
