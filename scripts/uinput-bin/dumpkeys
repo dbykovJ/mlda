@@ -1,0 +1,3 @@
+#!/bin/sh
+# Elevate only the console layout query used by pynput.
+exec /usr/bin/sudo -- /usr/bin/dumpkeys "$@"

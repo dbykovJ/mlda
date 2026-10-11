@@ -13,11 +13,15 @@ name = "keydynamics"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "evdev" },
     { name = "pynput" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pynput", specifier = ">=1.8.2" }]
+requires-dist = [
+    { name = "evdev", specifier = ">=2.0.0" },
+    { name = "pynput", specifier = ">=1.8.2" },
+]
 
 [[package]]
 name = "pynput"
