@@ -1,9 +1,10 @@
-import csv
+import uuid
 from queue import Queue
 import argparse
 import os
 import glob
 
+from keydynamics.csvwriter import save_queue, PeriodicWrite
 from keydynamics.keylistener import KeyListener
 from keydynamics.datagenerator import DataGenerator
 
@@ -25,13 +26,27 @@ def main() -> None:
     parser = parserSetup(parser)
 
     args = parser.parse_args()
+    out_path = args.output_path
 
-    session_id = get_session_id(args.output_path)
+    session_id = uuid.uuid4()
+
 
     memory = Queue()
-    dataGenerator = DataGenerator(session_id=session_id, participant_id=args.participant_id, memory=memory, session_timeout=args.session_timeout)
+
+
+    dataGenerator = DataGenerator(session_id=session_id, participant_id=args.participant_id, memory=memory, sample_timeout=args.sample_timeout)
     keyListener = KeyListener(dataGenerator)
-    keyListener.listen()
+
+    periodicWrite = PeriodicWrite(5, save_queue, memory=memory, path=out_path)
+    periodicWrite.start()
+
+    try:
+        keyListener.listen()
+    finally:
+        periodicWrite.stop()
+        periodicWrite.join()
+        save_queue(memory, out_path)
+
 
 if __name__ == "__main__":
     main()

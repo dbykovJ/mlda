@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.14"
 
 [[package]]
@@ -13,13 +13,13 @@ name = "keydynamics"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "evdev" },
+    { name = "evdev", marker = "sys_platform == 'linux'" },
     { name = "pynput" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "evdev", specifier = ">=2.0.0" },
+    { name = "evdev", marker = "sys_platform == 'linux'", specifier = ">=2.0.0" },
     { name = "pynput", specifier = ">=1.8.2" },
 ]
 

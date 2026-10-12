@@ -64,18 +64,21 @@ class KeyListener:
         )
 
     def on_press(self, key: keyboard.Key | keyboard.KeyCode | None) -> None:
-        if key is None:
+        if key is None or key == keyboard.Key.esc:
             return
         self.dataGenerator.registerPress(
             key_code=key_code(key), timestamp=time.time(), key=key_char(key)
         )
 
-    def on_release(self, key: keyboard.Key | keyboard.KeyCode | None) -> None:
+    def on_release(self, key: keyboard.Key | keyboard.KeyCode | None) -> None | bool:
         if key is None:
-            return
+            return None
+        if key == keyboard.Key.esc:
+            return False
         self.dataGenerator.registerRelease(
             key_code=key_code(key), timestamp=time.time(), key=key_char(key)
         )
+        return None
 
     def listen(self) -> None:
         print("Listening to keys...")
