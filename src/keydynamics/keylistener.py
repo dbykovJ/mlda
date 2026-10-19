@@ -9,14 +9,12 @@ if sys.platform == "linux":
     helper_dir = Path(__file__).resolve().parents[2] / "scripts" / "uinput-bin"
     os.environ["PATH"] = str(helper_dir) + os.pathsep + os.environ.get("PATH", "")
 
-    import evdev
-    from evdev import ecodes
-
-
 from pynput import keyboard
 
 
 def select_linux_device() -> str:
+    import evdev
+    from evdev import ecodes
 
     keyboards = []
 
