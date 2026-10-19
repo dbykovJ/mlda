@@ -28,7 +28,8 @@ def save_queue(memory: Queue[KeyData], path: str) -> None:
             writer.writeheader()
         writer.writerows(asdict(row) for row in rows)
 
-    print("Written")
+    if rows:
+        print(f"Written {len(rows)} events to {path}")
 
 
 class PeriodicWrite(Thread):

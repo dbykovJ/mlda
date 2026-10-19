@@ -56,7 +56,8 @@ class DataGenerator:
     def check_new_session(self, timestamp: float) -> None:
         if (
             self.last_event_time is not None
-            and timestamp - self.last_event_time > self.session_timeout
+            and not self.pressed_keys
+            and timestamp - self.last_event_time > self.sample_timeout
         ):
             self.sample_id += 1
         self.last_event_time = timestamp

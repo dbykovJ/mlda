@@ -14,6 +14,30 @@ if sys.platform == "linux":
 from pynput.keyboard import Key, KeyCode, Listener
 
 
+class LinuxListener(Listener):
+    """Keep physical codes and handle termination in pynput's uinput loop."""
+
+    event_key_code: int | None = None
+
+    def _handle_message(self, event):
+        # pynput translates the raw key events based on layout
+        # to preserve the key code for pairing press and release, we wrap it here
+        self.event_key_code = event.code
+        super()._handle_message(event)
+
+    def _run(self):
+        try:
+            super()._run()
+        except self.StopException:
+            pass
+        except Exception:
+            # AbstractListener.join() consumes this queue and reraises errors.
+            self._queue.put(sys.exc_info())
+        finally:
+            self._running = False
+            self._dev.close()
+
+
 def select_linux_device() -> str:
     import evdev
     from evdev import ecodes
@@ -57,7 +81,8 @@ class KeyListener:
         options = {}
         if sys.platform == "linux":
             options["uinput_device_paths"] = [select_linux_device()]
-        self.listener: Listener = Listener(
+        listener_class = LinuxListener if sys.platform == "linux" else Listener
+        self.listener: Listener = listener_class(
             on_press=self.on_press,
             on_release=self.on_release,
             **options,  # pyright: ignore[reportUnknownArgumentType]
@@ -66,7 +91,7 @@ class KeyListener:
     def on_press(self, key: Key | KeyCode | None) -> None:
         if key is None or key == Key.esc:
             return
-        code = key_code(key)
+        code = self._key_code(key)
         if code is None:
             return
 
@@ -79,13 +104,18 @@ class KeyListener:
             return None
         if key == Key.esc:
             return False
-        code = key_code(key)
+        code = self._key_code(key)
         if code is None:
             return None
         self.dataGenerator.registerRelease(
             key_code=code, timestamp=time.time(), key=key_char(key)
         )
         return None
+
+    def _key_code(self, key: Key | KeyCode) -> int | None:
+        if isinstance(self.listener, LinuxListener):
+            return self.listener.event_key_code
+        return key_code(key)
 
     def listen(self) -> None:
         print("Listening to keys...")

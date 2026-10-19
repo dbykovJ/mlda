@@ -42,6 +42,8 @@ def main() -> None:
 
     try:
         keyListener.listen()
+    except KeyboardInterrupt:
+        print("\nRecording stopped.")
     finally:
         periodicWrite.stop()
         periodicWrite.join()
