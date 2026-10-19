@@ -15,6 +15,7 @@ class SampleProps:
     release_release: float
 
 
+    @classmethod
     def from_sample(cls, sample: list[KeyData]) -> "SampleProps | None":
         df = pd.DataFrame([asdict(k) for k in sample])
  
@@ -62,6 +63,7 @@ class SampleProps:
 class KeyModel:
     sample_props: list[SampleProps]
 
+    @classmethod
     def from_csv(cls, path: str) -> "KeyModel":
         df = pd.read_csv(path)
         props = []
