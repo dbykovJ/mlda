@@ -12,4 +12,4 @@ class KeyData:
     key_code: int
     timestamp: float
     press_id: int
-    key: str
+    key: str | None
