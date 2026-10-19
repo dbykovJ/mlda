@@ -15,7 +15,7 @@ from pynput.keyboard import Key, KeyCode, Listener
 
 
 class LinuxListener(Listener):
-    """Keep physical codes and handle termination in pynput's uinput loop."""
+    """Preserve physical key codes before pynput's layout translation."""
 
     event_key_code: int | None = None
 
@@ -24,18 +24,6 @@ class LinuxListener(Listener):
         # to preserve the key code for pairing press and release, we wrap it here
         self.event_key_code = event.code
         super()._handle_message(event)
-
-    def _run(self):
-        try:
-            super()._run()
-        except self.StopException:
-            pass
-        except Exception:
-            # AbstractListener.join() consumes this queue and reraises errors.
-            self._queue.put(sys.exc_info())
-        finally:
-            self._running = False
-            self._dev.close()
 
 
 def select_linux_device() -> str:
@@ -89,7 +77,7 @@ class KeyListener:
         )
 
     def on_press(self, key: Key | KeyCode | None) -> None:
-        if key is None or key == Key.esc:
+        if key is None:
             return
         code = self._key_code(key)
         if code is None:
@@ -99,18 +87,15 @@ class KeyListener:
             key_code=code, timestamp=time.time(), key=key_char(key)
         )
 
-    def on_release(self, key: Key | KeyCode | None) -> None | bool:
+    def on_release(self, key: Key | KeyCode | None) -> None:
         if key is None:
-            return None
-        if key == Key.esc:
-            return False
+            return
         code = self._key_code(key)
         if code is None:
-            return None
+            return
         self.dataGenerator.registerRelease(
             key_code=code, timestamp=time.time(), key=key_char(key)
         )
-        return None
 
     def _key_code(self, key: Key | KeyCode) -> int | None:
         if isinstance(self.listener, LinuxListener):
