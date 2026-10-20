@@ -152,6 +152,7 @@ dependencies = [
     { name = "pandas" },
     { name = "pynput" },
     { name = "scikit-learn" },
+    { name = "scipy" },
 ]
 
 [package.metadata]
@@ -162,6 +163,7 @@ requires-dist = [
     { name = "pandas", specifier = ">=3.0.6" },
     { name = "pynput", specifier = ">=1.8.2" },
     { name = "scikit-learn", specifier = ">=1.9.1" },
+    { name = "scipy", specifier = ">=1.18.1" },
 ]
 
 [[package]]
