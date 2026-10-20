@@ -3,6 +3,7 @@ from dataclasses import asdict, dataclass
 import numpy as np
 import pandas as pd
 
+from keydynamics.clean_data import remove_outliers_z
 from keydynamics.keydata import KeyData
 
 
@@ -13,6 +14,7 @@ class SampleProps:
     press_release: float
     release_press: float
     release_release: float
+    user_id: int|None = None
 
     @classmethod
     def from_sample(cls, sample: list[KeyData]) -> SampleProps | None:
@@ -27,7 +29,7 @@ class SampleProps:
         ).rename(columns={"timestamp_p": "p", "timestamp_r": "r"})
         keys = keys.sort_values("p")
 
-        if len(keys) < 2:
+        if len(keys) < 10:
             return None
 
         H = keys.r - keys.p  # r_i - p_i
@@ -37,6 +39,7 @@ class SampleProps:
         DU = keys.r.shift(-1) - keys.p  # r_{i+1} - p_i
 
         return cls(
+            user_id=keys.participant_id.iloc[0] if not keys.participant_id.empty else None,
             dwell_time=H.mean(),
             press_press=DD.mean(),
             press_release=DU.mean(),
@@ -47,6 +50,7 @@ class SampleProps:
     def to_np(self) -> np.ndarray:
         return np.array(
             [
+                self.user_id,
                 self.dwell_time,
                 self.press_press,
                 self.press_release,
@@ -80,3 +84,12 @@ class KeyModel:
     @classmethod
     def from_file(cls, path: str) -> KeyModel:
         return cls(sample_props=[SampleProps(*row) for row in np.load(path)])
+
+    def clean(self) -> pd.DataFrame:
+        z_threshold = 3
+        df = pd.DataFrame([asdict(sample) for sample in self.sample_props])
+        df["e_distance"] = np.linalg.norm(df.to_numpy(), axis=1)
+        df_cleaned = remove_outliers_z(df, z_threshold)
+        df_cleaned = df_cleaned.drop(columns=["e_distance"])
+        return df_cleaned
+
