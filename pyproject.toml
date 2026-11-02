@@ -22,6 +22,7 @@ dependencies = [
 
 [project.scripts]
 keydynamics = "keydynamics:main"
+ui = "keydynamics.ui.ui:main"
 
 [build-system]
 requires = ["uv_build>=0.12.21,<0.13.0"]
@@ -30,3 +31,4 @@ build-backend = "uv_build"
 [tool.basedpyright]
 venvPath = "."
 venv = ".venv"
+typeCheckingMode = "standard"
