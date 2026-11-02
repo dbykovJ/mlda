@@ -1,6 +1,6 @@
 import numpy as np
 
-from keydynamics.model import KeyModel, SampleProps
+from keydynamics.models.model import KeyModel, SampleProps
 
 
 def check_sample(
