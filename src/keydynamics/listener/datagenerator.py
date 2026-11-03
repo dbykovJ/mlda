@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from queue import Queue
 from uuid import UUID
 
-from keydynamics.keydata import KeyData
+from keydynamics.listener.keydata import KeyData
 
 
 @dataclass()

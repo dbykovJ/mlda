@@ -3,12 +3,12 @@ import sys
 import time
 from pathlib import Path
 
-from keydynamics.datagenerator import DataGenerator
+from keydynamics.listener.datagenerator import DataGenerator
 
 if sys.platform == "linux":
     os.environ["PYNPUT_BACKEND_KEYBOARD"] = "uinput"
     os.environ["PYNPUT_BACKEND_MOUSE"] = "dummy"
-    helper_dir = Path(__file__).resolve().parents[2] / "scripts" / "uinput-bin"
+    helper_dir = Path(__file__).resolve().parents[3] / "scripts" / "uinput-bin"
     os.environ["PATH"] = str(helper_dir) + os.pathsep + os.environ.get("PATH", "")
 
 from pynput.keyboard import Key, KeyCode, Listener

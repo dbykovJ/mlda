@@ -4,7 +4,7 @@ from pathlib import Path
 from queue import Empty, Queue
 from threading import Event, Thread
 
-from keydynamics.keydata import KeyData
+from keydynamics.listener.keydata import KeyData
 
 
 def save_queue(memory: Queue[KeyData], path: str) -> None:

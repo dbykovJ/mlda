@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [project.scripts]
-keydynamics = "keydynamics:main"
+listener = "keydynamics.listener:main"
 ui = "keydynamics.ui.ui:main"
 
 [build-system]
