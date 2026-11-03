@@ -1,15 +1,15 @@
+"""Application entry point and window layout."""
+
+import os
 import sys
-import time
 from pathlib import Path
-from queue import Queue
-from uuid import uuid4
 
 import numpy as np
-import pyqtgraph as pg
-from PySide6.QtCore import QEvent
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
+    QHBoxLayout,
     QLabel,
     QMessageBox,
     QPlainTextEdit,
@@ -17,11 +17,10 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
 
-from keydynamics.datagenerator import DataGenerator
-from keydynamics.models.model import KeyModel
+from keydynamics.ui.model_plot import ModelPlot
+from keydynamics.ui.projection import ModelProjection
+from keydynamics.ui.typing_recorder import TypingRecorder
 
 
 class Window(QWidget):
@@ -29,22 +28,29 @@ class Window(QWidget):
         super().__init__()
         self.setWindowTitle("Keystroke model — 2D PCA")
         self.resize(800, 650)
-        self.model = None
-        self.scaler = None
-        self.pca = None
+        self.projection = ModelProjection()
 
-        self.import_button = QPushButton("Import .npy model…")
+        self.import_button = QPushButton("Import .npy models…")
         self.import_button.clicked.connect(self.import_model)
-        self.status = QLabel("Import a model to display its samples.")
+        self.clear_button = QPushButton("Clear models")
+        self.clear_button.clicked.connect(self.clear_models)
+        self.status = QLabel("Import models to compare their distributions.")
         self.status.setWordWrap(True)
 
-        self.plot = pg.PlotWidget()
-        self.plot.showGrid(x=True, y=True)
-        self.plot.setLabel("bottom", "Principal component 1")
-        self.plot.setLabel("left", "Principal component 2")
-        self.curve = self.plot.plot(pen=None, symbol="o", symbolBrush="c")
+        self.plot = ModelPlot()
+        self.live_status = QLabel(
+            "Live typing: 10 completed keystrokes needed per sample."
+        )
+        self.live_status.setWordWrap(True)
 
         self.textbox = QPlainTextEdit()
+        # Timing features require individual key events, not compressed text input.
+        self.textbox.setAttribute(Qt.WidgetAttribute.WA_KeyCompression, False)
+        # Measure physical typing rather than text committed by an input method.
+        self.textbox.setAttribute(Qt.WidgetAttribute.WA_InputMethodEnabled, False)
+        self.textbox.viewport().setAttribute(
+            Qt.WidgetAttribute.WA_InputMethodEnabled, False
+        )
         font = self.textbox.font()
         font.setPointSize(20)
         self.textbox.setFont(font)
@@ -61,89 +67,104 @@ class Window(QWidget):
         self.textbox.setFixedHeight(self.textbox.fontMetrics().lineSpacing() * 5 + 40)
         self.textbox.setPlaceholderText("Type here…")
 
-        self.events = Queue()
-        self.generator = DataGenerator(
-            participant_id=0, session_id=uuid4(), memory=self.events
+        self.recorder = TypingRecorder(self.textbox)
+        self.recorder.model_changed.connect(self.update_live_sample)
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(20, 20, 20, 20)
+        self.content = QWidget()
+        self.content.setMaximumWidth(800)
+        outer.addWidget(
+            self.content, stretch=1, alignment=Qt.AlignmentFlag.AlignHCenter
         )
-
-        self.textbox.installEventFilter(self)
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout = QVBoxLayout(self.content)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(20)
-        layout.addWidget(self.import_button)
+        buttons = QHBoxLayout()
+        buttons.addWidget(self.import_button)
+        buttons.addWidget(self.clear_button)
+        layout.addLayout(buttons)
         layout.addWidget(self.status)
         layout.addWidget(self.plot, stretch=1)
+        layout.addWidget(self.live_status)
         layout.addWidget(self.textbox)
 
-    def eventFilter(self, watched, event):
-        if (
-            watched is self.textbox
-            and event.type()
-            in (
-                QEvent.Type.KeyPress,
-                QEvent.Type.KeyRelease,
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        margins = self.layout().contentsMargins()
+        width = max(0, min(800, self.width() - margins.left() - margins.right()))
+        self.content.setFixedWidth(width)
+
+    def update_live_sample(self, model, completed):
+        if not model.sample_props:
+            self.live_status.setText(
+                f"Live typing: {completed}/10 completed keystrokes in this sample."
             )
-            and not event.isAutoRepeat()
-        ):
-            key_code = event.nativeScanCode() or event.key()
-            timestamp = time.perf_counter()
-            text = event.text() or None
-
-            if event.type() == QEvent.Type.KeyPress:
-                self.generator.registerPress(key_code, timestamp, text)
-            else:
-                self.generator.registerRelease(key_code, timestamp, text)
-
-        # Let the text box process the event normally.
-        return super().eventFilter(watched, event)
-
-    def import_model(self):
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Import keystroke model", "", "NumPy models (*.npy)"
-        )
-        if not path:
+            return
+        if self.projection.scaler is None or self.projection.pca is None:
+            self.live_status.setText(
+                "Live samples recorded. Import a model to project them."
+            )
             return
 
-        try:
-            self.load_model(path)
-        except (OSError, ValueError, TypeError, EOFError, IndexError) as error:
-            QMessageBox.warning(self, "Cannot import model", str(error))
+        points = self.projection.transform(model)
+        self.plot.show_live(points)
+        self.live_status.setText(
+            f"Live typing: {len(points)} samples · {completed} completed keystrokes "
+            f"in this sample · pause over 3 seconds to start another."
+        )
+
+    def import_model(self):
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, "Import keystroke models", "", "NumPy models (*.npy)"
+        )
+        errors = []
+        for path in paths:
+            try:
+                self.load_model(path)
+            except (OSError, ValueError, TypeError, EOFError, IndexError) as error:
+                errors.append(f"{Path(path).name}: {error}")
+        if errors:
+            QMessageBox.warning(self, "Cannot import models", "\n".join(errors))
 
     def load_model(self, path):
-        model = KeyModel.from_file(path)
-        if not model.sample_props:
-            raise ValueError("The model contains no samples.")
-        if not np.isfinite(model.to_np()).all():
-            raise ValueError("Model features must be finite numbers.")
-
-        samples = model.clean().to_numpy(dtype=float)
-        if samples.shape[0] < 2:
-            raise ValueError(
-                "At least two samples must remain after cleaning for 2D PCA."
-            )
-
-        scaler = StandardScaler()
-        scaled = scaler.fit_transform(samples)
-        if not np.any(np.var(scaled, axis=0) > 0):
-            raise ValueError("The samples have no variation to visualize.")
-        pca = PCA(n_components=2)
-        points = pca.fit_transform(scaled)
-
-        self.model = model
-        self.scaler = scaler
-        self.pca = pca
-        self.curve.setData(points[:, 0], points[:, 1])
+        if not self.projection.add_model(path):
+            return
+        self.plot.show_models(self.projection.projected)
+        self.update_live_sample(self.recorder.live_model, self.recorder.completed)
         self.plot.autoRange()
+        counts = "; ".join(
+            f"{entry.path.name}: {len(entry.samples)}/{len(entry.model.sample_props)} samples"
+            for entry in self.projection.models
+        )
+        pca = self.projection.pca
         self.status.setText(
-            f"{Path(path).name} — {len(samples)} / {len(model.sample_props)} samples "
-            f"after cleaning · explained variance: "
-            f"PC1 {pca.explained_variance_ratio_[0]:.1%}, "
+            f"{len(self.projection.models)} models · 75% spread ellipses · {counts}\n"
+            f"Shared PCA explained variance: PC1 {pca.explained_variance_ratio_[0]:.1%}, "
             f"PC2 {pca.explained_variance_ratio_[1]:.1%}"
         )
 
+    def clear_models(self):
+        self.projection.clear()
+        self.plot.clear_references()
+        self.plot.show_live(np.empty((0, 2)))
+        self.status.setText("Import models to compare their distributions.")
+        self.update_live_sample(self.recorder.live_model, self.recorder.completed)
+
 
 def main():
+    if (
+        sys.platform == "linux"
+        and (
+            os.environ.get("WAYLAND_DISPLAY")
+            or os.environ.get("XDG_SESSION_TYPE") == "wayland"
+        )
+        and "QT_IM_MODULE" not in os.environ
+        and "QT_IM_MODULES" not in os.environ
+    ):
+        # Wayland text-input can consume key events needed for timing measurements.
+        os.environ["QT_IM_MODULE"] = "compose"
+
     app = QApplication(sys.argv)
     window = Window()
     window.show()
