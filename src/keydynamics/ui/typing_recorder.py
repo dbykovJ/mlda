@@ -7,7 +7,7 @@ from uuid import uuid4
 import numpy as np
 from PySide6.QtCore import QEvent, QObject, Signal
 
-from keydynamics.datagenerator import DataGenerator
+from keydynamics.listener.datagenerator import DataGenerator
 from keydynamics.models.model import KeyModel, SampleProps
 
 

@@ -3,7 +3,7 @@ from dataclasses import asdict, dataclass
 import numpy as np
 import pandas as pd
 
-from keydynamics.keydata import KeyData
+from keydynamics.listener.keydata import KeyData
 from keydynamics.models.data_cleaning.clean_data import remove_outliers_z
 
 
