@@ -39,6 +39,7 @@ class Window(QWidget):
         self.user_mode = QRadioButton("User mode")
         self.user_mode.setChecked(True)
         self.global_mode = QRadioButton("Global mode")
+        self.global_mode.toggled.connect(self.on_mode_changed)
         self.status = QLabel("Import models to compare their distributions.")
         self.status.setWordWrap(True)
 
@@ -138,6 +139,11 @@ class Window(QWidget):
             f"Live typing: {len(points)} samples · {completed} completed keystrokes "
             f"in this sample · pause over 3 seconds to start another."
         )
+
+    def on_mode_changed(self):
+        self.plot.global_mode = self.global_mode.isChecked()
+        self.plot.show_models(self.projection.projected)
+        self.update_live_sample(self.recorder.live_model, self.recorder.completed)
 
     def _outside_view(self, points: np.ndarray) -> bool:
         (xmin, xmax), (ymin, ymax) = self.plot.getViewBox().viewRange()

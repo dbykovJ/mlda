@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import pyqtgraph as pg
+from PySide6.QtCore import QRectF
 from PySide6.QtGui import QColor, QTransform
 
 from keydynamics.ui.projection import ProjectedModel
@@ -24,6 +25,8 @@ class ModelPlot(pg.PlotWidget):
         self.references: list[ModelGraphics] = []
         self.projection = None
         self.contour_resolution = 100
+        self.global_mode = False
+        self.global_image = None
         self.setAspectLocked(True, ratio=1)
         for position in ("bottom", "left"):
             axis = self.getAxis(position)
@@ -89,6 +92,8 @@ class ModelPlot(pg.PlotWidget):
         )
 
     def _decision_contour(self, entry: ProjectedModel, color):
+        if self.global_mode:
+            return None
         if self.projection is None or entry.source.user_model is None:
             return None
         # Grid around this model's own points so a large model cannot
@@ -119,12 +124,45 @@ class ModelPlot(pg.PlotWidget):
         self.addItem(contour)
         return contour
 
+    def _global_regions(self, extent):
+        grid = self.projection.global_grid(extent, self.contour_resolution)
+        if grid is None:
+            return None
+        xs, ys, field = grid
+        image = np.zeros((*field.shape, 4), dtype=np.uint8)
+        for user_id in np.unique(field):
+            name = next(
+                (e.name for e in self.projection.models if e.user_id == user_id),
+                None,
+            )
+            color = QColor(self._color_for(name) if name else "#888888")
+            color.setAlpha(60)
+            image[field == user_id] = (
+                color.red(), color.green(), color.blue(), color.alpha(),
+            )
+        item = pg.ImageItem(image=image)
+        item.setRect(QRectF(xs[0], ys[0], xs[-1] - xs[0], ys[-1] - ys[0]))
+        item.setZValue(-3)
+        self.addItem(item)
+        return item
+
     def show_models(self, models: list[ProjectedModel]):
         self.clear_references()
+        if self.global_mode and models:
+            all_points = np.vstack([entry.points for entry in models])
+            low = all_points.min(axis=0)
+            high = all_points.max(axis=0)
+            pad = np.maximum((high - low) * 0.1, 0.05)
+            extent = (low[0] - pad[0], high[0] + pad[0],
+                      low[1] - pad[1], high[1] + pad[1])
+            self.global_image = self._global_regions(extent)
         for entry in models:
             self.add_reference(entry)
 
     def clear_references(self):
+        if self.global_image is not None:
+            self.removeItem(self.global_image)
+            self.global_image = None
         for entry in self.references:
             items = [entry.centroid, entry.points]
             if entry.contour is not None:

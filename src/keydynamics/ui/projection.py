@@ -9,6 +9,7 @@ from sklearn.preprocessing import StandardScaler
 
 from keydynamics.models.model import KeyModel
 from keydynamics.models.UserModel import UserModel
+from keydynamics.models.GlobalModel import GlobalModel
 
 
 @dataclass
@@ -34,6 +35,7 @@ class ModelProjection:
         self.projected: list[ProjectedModel] = []
         self.scaler = None
         self.pca = None
+        self.global_model = None
         self._next_user_id = 1
 
     @staticmethod
@@ -62,6 +64,15 @@ class ModelProjection:
         # Commit only after every calculation succeeds.
         self.models, self.projected = models, projected
         self.scaler, self.pca = scaler, pca
+        self.global_model = self._build_global_model(models)
+
+    @staticmethod
+    def _build_global_model(models: list[ImportedModel]) -> GlobalModel:
+        global_model = GlobalModel()
+        for entry in models:
+            for sample in entry.model.to_np():
+                global_model.add_sample(sample, entry.user_id)
+        return global_model
 
     def _build_user_model(self, model: KeyModel) -> UserModel:
         user_model = UserModel.buildModel(model.to_np(), user_id=self._next_user_id)
@@ -144,9 +155,41 @@ class ModelProjection:
             return np.empty((0, 2))
         return self.pca.transform(self.scaler.transform(model.to_np()))
 
+    def global_grid(
+        self,
+        extent: tuple[float, float, float, float],
+        resolution: int = 100,
+        k: int = 5,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+        """k-NN attribution (user_id) on a grid over the PC plane, without mutating
+        the global model. z is indexed [ix, iy] like decision_grid."""
+        if (
+            self.global_model is None
+            or not self.global_model.samples
+            or self.pca is None
+            or self.scaler is None
+        ):
+            return None
+        x0, x1, y0, y1 = extent
+        xs = np.linspace(x0, x1, resolution)
+        ys = np.linspace(y0, y1, resolution)
+        gx, gy = np.meshgrid(xs, ys, indexing="ij")
+        points = np.column_stack([gx.ravel(), gy.ravel()])
+        features = self.scaler.inverse_transform(self.pca.inverse_transform(points))
+        stored = np.array([sample for sample, _ in self.global_model.samples])
+        labels = np.array([user_id for _, user_id in self.global_model.samples])
+        k = min(k, len(labels))
+        distances = np.linalg.norm(
+            features[:, None, :] - stored[None, :, :], axis=2
+        )
+        nearest = labels[np.argsort(distances, axis=1)[:, :k]]
+        field = np.array([np.bincount(row).argmax() for row in nearest])
+        return xs, ys, field.reshape(len(xs), len(ys))
+
     def clear(self):
         self.models.clear()
         self.projected.clear()
         self.scaler = None
         self.pca = None
+        self.global_model = None
         self._next_user_id = 1

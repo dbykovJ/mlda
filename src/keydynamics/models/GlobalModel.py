@@ -8,7 +8,7 @@ import numpy as np
 class GlobalModel:
     samples: list[tuple[np.ndarray, int]] = field(default_factory=list)
 
-    def check_sample(self, sample: np.ndarray, k: int) -> int:
+    def vote(self, sample: np.ndarray, k: int) -> int:
         if len(self.samples) < 1:
             raise ValueError("Global model has no samples to compare against.")
 
@@ -20,6 +20,10 @@ class GlobalModel:
         distances.sort(key=lambda x: x[0])
         counts = Counter(s[1] for s in distances[:k])
         user_id, count = counts.most_common(1)[0]
+        return user_id
+
+    def check_sample(self, sample: np.ndarray, k: int) -> int:
+        user_id = self.vote(sample, k)
         self.samples.append((sample, user_id))
         return user_id
 
