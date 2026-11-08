@@ -24,6 +24,7 @@ class TypingRecorder(QObject):
         self.live_model = KeyModel(sample_props=[])
         self.sample_events = {}
         self.live_props = {}
+        self.saved_samples = {}
         self.completed = 0
         textbox.installEventFilter(self)
 
@@ -82,3 +83,39 @@ class TypingRecorder(QObject):
         )
         self.completed = completed
         self.model_changed.emit(self.live_model, completed)
+
+    def mark_saved(self, name: str):
+        for sample_id in self.live_props:
+            self.saved_samples.setdefault(sample_id, name)
+
+    def sample_names(self) -> list[str | None]:
+        # Aligned with live_model.sample_props, which is sorted by sample id.
+        return [self.saved_samples.get(i) for i in sorted(self.live_props)]
+
+    def clear_unsaved(self):
+        self.drain_queue()
+        keep = set(self.saved_samples)
+        self.sample_events = {
+            i: events for i, events in self.sample_events.items() if i in keep
+        }
+        self.live_props = {i: p for i, p in self.live_props.items() if i in keep}
+        self.live_model = KeyModel(
+            sample_props=[self.live_props[i] for i in sorted(self.live_props)]
+        )
+        self.completed = 0
+        self.model_changed.emit(self.live_model, self.completed)
+
+    def reset(self):
+        while True:
+            try:
+                self.events.get_nowait()
+            except Empty:
+                break
+        self.sample_events.clear()
+        self.live_props.clear()
+        self.saved_samples.clear()
+        self.live_model = KeyModel(sample_props=[])
+        self.completed = 0
+        self.generator.pressed_keys.clear()
+        self.generator.sample_id += 1
+        self.model_changed.emit(self.live_model, self.completed)

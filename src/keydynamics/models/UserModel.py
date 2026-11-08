@@ -14,7 +14,8 @@ class UserModel:
 
     @staticmethod
     def _fit(samples: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        median = np.median(samples, axis=0)
+        median = np.median(samples, axis=0)  # median per feature (5,)
+        # the median absolute deviaton, scalled to estimate the std deviato per feature (5,)
         mad = 1.4826 * np.median(np.abs(samples - median), axis=0) + 1e-8
         return median, mad
 
@@ -45,7 +46,9 @@ class UserModel:
     def compare_sample(self, sample: np.ndarray) -> float:
         if not self.median or not self.average_center_distance:
             raise ValueError("Model is not fitted yet.")
-        return float(np.linalg.norm((sample - self.median) / self.average_center_distance))
+        return float(
+            np.linalg.norm((sample - self.median) / self.average_center_distance)
+        )
 
     def is_user(self, sample: np.ndarray) -> bool:
         return self.compare_sample(sample) <= self.threshold
