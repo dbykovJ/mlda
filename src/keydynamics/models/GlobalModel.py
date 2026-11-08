@@ -8,7 +8,10 @@ import numpy as np
 class GlobalModel:
     samples: list[tuple[np.ndarray, int]] = field(default_factory=list)
 
-    def check_sample(self, sample: np.ndarray, k: int) -> float:
+    def check_sample(self, sample: np.ndarray, k: int) -> int:
+        if len(self.samples) < 1:
+            raise ValueError("Global model has no samples to compare against.")
+
         distances = []
         for model_sample in self.samples:
             distance = np.linalg.norm(sample - model_sample[0])

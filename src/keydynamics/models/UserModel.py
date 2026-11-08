@@ -43,6 +43,8 @@ class UserModel:
         return cls(user_id, model, median, mad, threshold)
 
     def compare_sample(self, sample: np.ndarray) -> float:
+        if not self.median or not self.average_center_distance:
+            raise ValueError("Model is not fitted yet.")
         return float(np.linalg.norm((sample - self.median) / self.average_center_distance))
 
     def is_user(self, sample: np.ndarray) -> bool:
