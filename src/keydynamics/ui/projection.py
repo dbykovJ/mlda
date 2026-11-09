@@ -116,7 +116,7 @@ class ModelProjection:
         features = self.scaler.inverse_transform(self.pca.inverse_transform(points))
         user_model = entry.user_model
         z = np.linalg.norm(
-            (features - user_model.median) / user_model.average_center_distance,
+            (features - user_model.median) / user_model.mad,
             axis=1,
         )
         return xs, ys, z.reshape(len(xs), len(ys))

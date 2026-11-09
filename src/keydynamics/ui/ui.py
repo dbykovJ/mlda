@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QRadioButton,
+    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
@@ -40,11 +41,19 @@ class Window(QWidget):
         self.user_mode.setChecked(True)
         self.global_mode = QRadioButton("Global mode")
         self.global_mode.toggled.connect(self.on_mode_changed)
+        self.global_k_label = QLabel("Global k:")
+        self.global_k = QSpinBox()
+        self.global_k.setRange(1, 999)
+        self.global_k.setValue(5)
+        self.global_k_label.setEnabled(False)
+        self.global_k.setEnabled(False)
+        self.global_k.valueChanged.connect(self.on_global_k_changed)
         self.status = QLabel("Import models to compare their distributions.")
         self.status.setWordWrap(True)
 
         self.plot = ModelPlot()
         self.plot.projection = self.projection
+        self.plot.global_k = self.global_k.value()
         self.live_status = QLabel(
             "Live typing: 10 completed keystrokes needed per sample."
         )
@@ -100,6 +109,8 @@ class Window(QWidget):
         buttons.addStretch(1)
         buttons.addWidget(self.user_mode)
         buttons.addWidget(self.global_mode)
+        buttons.addWidget(self.global_k_label)
+        buttons.addWidget(self.global_k)
         layout.addLayout(buttons)
         layout.addWidget(self.status)
         layout.addWidget(self.plot, stretch=1)
@@ -142,6 +153,15 @@ class Window(QWidget):
 
     def on_mode_changed(self):
         self.plot.global_mode = self.global_mode.isChecked()
+        self.global_k_label.setEnabled(self.plot.global_mode)
+        self.global_k.setEnabled(self.plot.global_mode)
+        self.plot.show_models(self.projection.projected)
+        self.update_live_sample(self.recorder.live_model, self.recorder.completed)
+
+    def on_global_k_changed(self, value: int):
+        self.plot.global_k = value
+        if not self.plot.global_mode:
+            return
         self.plot.show_models(self.projection.projected)
         self.update_live_sample(self.recorder.live_model, self.recorder.completed)
 
@@ -166,7 +186,7 @@ class Window(QWidget):
         flags = [False] * len(model.sample_props)
         for user_model in user_models:
             scores = np.linalg.norm(
-                (features - user_model.median) / user_model.average_center_distance,
+                (features - user_model.median) / user_model.mad,
                 axis=1,
             )
             flags = [

@@ -26,6 +26,7 @@ class ModelPlot(pg.PlotWidget):
         self.projection = None
         self.contour_resolution = 100
         self.global_mode = False
+        self.global_k = 5
         self.global_image = None
         self.setAspectLocked(True, ratio=1)
         for position in ("bottom", "left"):
@@ -125,7 +126,11 @@ class ModelPlot(pg.PlotWidget):
         return contour
 
     def _global_regions(self, extent):
-        grid = self.projection.global_grid(extent, self.contour_resolution)
+        grid = self.projection.global_grid(
+            extent,
+            self.contour_resolution,
+            k=self.global_k,
+        )
         if grid is None:
             return None
         xs, ys, field = grid

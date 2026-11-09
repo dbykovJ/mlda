@@ -9,18 +9,19 @@ class UserModel:
     user_id: int
     samples: np.ndarray
     median: np.ndarray
-    average_center_distance: np.ndarray
+    mad: np.ndarray
     threshold: float
+
+    def loo_scores(self) -> np.ndarray:
+        return self._loo_scores(self.samples)
+
 
     @staticmethod
     def _fit(samples: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         median = np.median(samples, axis=0)  # median per feature (5,)
-        # the median absolute deviaton, scalled to estimate the std deviato per feature (5,)
+        # the median absolute deviation, scalled to estimate the std deviation per feature (5,)
         mad = 1.4826 * np.median(np.abs(samples - median), axis=0) + 1e-8
         return median, mad
-
-    def loo_scores(self) -> np.ndarray:
-        return self._loo_scores(self.samples)
 
     @staticmethod
     def _loo_scores(samples: np.ndarray) -> np.ndarray:
@@ -44,10 +45,10 @@ class UserModel:
         return cls(user_id, model, median, mad, threshold)
 
     def compare_sample(self, sample: np.ndarray) -> float:
-        if not self.median or not self.average_center_distance:
+        if not self.median or not self.mad:
             raise ValueError("Model is not fitted yet.")
         return float(
-            np.linalg.norm((sample - self.median) / self.average_center_distance)
+            np.linalg.norm((sample - self.median) / self.mad)
         )
 
     def is_user(self, sample: np.ndarray) -> bool:
