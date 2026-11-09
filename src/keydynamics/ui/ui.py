@@ -25,6 +25,12 @@ from keydynamics.ui.model_plot import ModelPlot
 from keydynamics.ui.projection import ModelProjection
 from keydynamics.ui.typing_recorder import TypingRecorder
 
+try:
+    from scripts.combine import load_key_model
+except ImportError:  # installed package without src/ on sys.path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from scripts.combine import load_key_model
+
 
 class Window(QWidget):
     def __init__(self):
@@ -35,6 +41,16 @@ class Window(QWidget):
 
         self.import_button = QPushButton("Import .npy models…")
         self.import_button.clicked.connect(self.import_model)
+        self.import_csv_button = QPushButton("Import .csv…")
+        self.import_csv_button.clicked.connect(self.import_csv)
+        self.min_len_label = QLabel("min sample length:")
+        self.min_len = QSpinBox()
+        self.min_len.setRange(1, 999)
+        self.min_len.setValue(20)
+        self.max_len_label = QLabel("max:")
+        self.max_len = QSpinBox()
+        self.max_len.setRange(1, 999)
+        self.max_len.setValue(60)
         self.clear_button = QPushButton("Clear models")
         self.clear_button.clicked.connect(self.clear_models)
         self.user_mode = QRadioButton("User mode")
@@ -105,6 +121,11 @@ class Window(QWidget):
         layout.setSpacing(20)
         buttons = QHBoxLayout()
         buttons.addWidget(self.import_button)
+        buttons.addWidget(self.import_csv_button)
+        buttons.addWidget(self.min_len_label)
+        buttons.addWidget(self.min_len)
+        buttons.addWidget(self.max_len_label)
+        buttons.addWidget(self.max_len)
         buttons.addWidget(self.clear_button)
         buttons.addStretch(1)
         buttons.addWidget(self.user_mode)
@@ -207,6 +228,34 @@ class Window(QWidget):
                 errors.append(f"{Path(path).name}: {error}")
         if errors:
             QMessageBox.warning(self, "Cannot import models", "\n".join(errors))
+
+    def import_csv(self):
+        min_len, max_len = self.min_len.value(), self.max_len.value()
+        if min_len > max_len:
+            QMessageBox.warning(
+                self, "Invalid sample length", "min must not exceed max."
+            )
+            return
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, "Import keystroke CSVs", "", "Keystroke CSV (*.csv)"
+        )
+        errors = []
+        for path in paths:
+            try:
+                model, dropped = load_key_model(Path(path), min_len, max_len)
+                if not self.projection.add_key_model(model, Path(path).name, Path(path)):
+                    errors.append(f"{Path(path).name}: already imported")
+                else:
+                    print(f"{Path(path).name}: {len(model.sample_props)} samples "
+                          f"({dropped} dropped, chunks of {min_len}-{max_len} presses)")
+            except (OSError, ValueError, TypeError, EOFError, IndexError) as error:
+                errors.append(f"{Path(path).name}: {error}")
+        self.plot.show_models(self.projection.projected)
+        self.update_live_sample(self.recorder.live_model, self.recorder.completed)
+        self.plot.autoRange()
+        self.update_status()
+        if errors:
+            QMessageBox.warning(self, "Cannot import CSVs", "\n".join(errors))
 
     def load_model(self, path):
         if not self.projection.add_model(path):

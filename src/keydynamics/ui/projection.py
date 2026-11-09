@@ -84,17 +84,28 @@ class ModelProjection:
         if any(entry.path == path for entry in self.models):
             return False
         model = KeyModel.from_file(str(path))
+        self._add(model, path.name, path)
+        return True
+
+    def add_key_model(self, model: KeyModel, name: str, path: Path | None = None) -> bool:
+        if path is not None and any(entry.path == Path(path).resolve() for entry in self.models):
+            return False
+        if any(entry.name == name for entry in self.models):
+            raise ValueError(f'A model named "{name}" already exists.')
+        self._add(model, name, path)
+        return True
+
+    def _add(self, model: KeyModel, name: str, path: Path | None) -> None:
         samples = self._clean_samples(model)
         entry = ImportedModel(
             model,
             samples,
-            path.name,
+            name,
             path,
             user_id=self._next_user_id,
             user_model=self._build_user_model(model),
         )
         self._refit(self.models + [entry])
-        return True
 
     def decision_grid(
         self, entry: ImportedModel, extent: tuple[float, float, float, float],

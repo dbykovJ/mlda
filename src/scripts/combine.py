@@ -32,25 +32,29 @@ COMBINED_CSV = Path("lorenz_combined.csv")
 OUTPUT = Path("lorenz_combined.npy")
 
 
-def split_events(events: list[KeyData]) -> list[list[KeyData]]:
-    """Split the event list into contiguous chunks whose registered press count
-    stays within MIN_PRESSES..MAX_PRESSES. Groups with at most MAX_PRESSES
-    presses are returned whole."""
+def split_events(
+    events: list[KeyData], max_presses: int = MAX_PRESSES
+) -> list[list[KeyData]]:
+    """Split the event list into contiguous chunks with at most max_presses
+    registered presses each. Groups within the limit are returned whole."""
     press_idx = [i for i, e in enumerate(events) if e.event == "PRESS"]
     n_presses = len(press_idx)
-    if n_presses <= MAX_PRESSES:
+    if n_presses <= max_presses:
         return [events]
-    n_chunks = -(-n_presses // MAX_PRESSES)  # ceil
+    n_chunks = -(-n_presses // max_presses)  # ceil
     cuts = [press_idx[k * n_presses // n_chunks] for k in range(1, n_chunks)]
     bounds = [0, *cuts, len(events)]
     return [events[bounds[i] : bounds[i + 1]] for i in range(n_chunks)]
 
 
-def main():
-    df = pd.concat((pd.read_csv(p) for p in CSVS), ignore_index=True)
-    df.to_csv(COMBINED_CSV, index=False)
-    print(f"merged {len(CSVS)} csvs -> {COMBINED_CSV} ({len(df)} rows)")
-
+def samples_from_dataframe(
+    df: pd.DataFrame, min_presses: int = MIN_PRESSES, max_presses: int = MAX_PRESSES
+) -> tuple[list[SampleProps], int]:
+    """Group key events by (session_id, sample_id), split each group into chunks
+    of at most max_presses presses, and drop chunks below min_presses.
+    Returns the sample props and the number of dropped chunks."""
+    if min_presses > max_presses:
+        raise ValueError("min_presses must not exceed max_presses")
     props = []
     dropped = 0
     for _, group in df.groupby(["session_id", "sample_id"]):
@@ -58,9 +62,9 @@ def main():
             (KeyData(**row) for row in group.to_dict("records")),
             key=lambda e: e.timestamp,
         )
-        for chunk in split_events(events):
+        for chunk in split_events(events, max_presses):
             presses = sum(1 for e in chunk if e.event == "PRESS")
-            if presses < MIN_PRESSES:
+            if presses < min_presses:
                 dropped += 1
                 continue
             sample = SampleProps.from_sample(chunk)
@@ -68,7 +72,25 @@ def main():
                 props.append(sample)
             else:
                 dropped += 1
+    return props, dropped
 
+
+def load_key_model(
+    path: Path, min_presses: int = MIN_PRESSES, max_presses: int = MAX_PRESSES
+) -> tuple[KeyModel, int]:
+    """Read one key-event CSV and build a KeyModel from its split samples."""
+    props, dropped = samples_from_dataframe(
+        pd.read_csv(path), min_presses, max_presses
+    )
+    return KeyModel(sample_props=props), dropped
+
+
+def main():
+    df = pd.concat((pd.read_csv(p) for p in CSVS), ignore_index=True)
+    df.to_csv(COMBINED_CSV, index=False)
+    print(f"merged {len(CSVS)} csvs -> {COMBINED_CSV} ({len(df)} rows)")
+
+    props, dropped = samples_from_dataframe(df)
     model = KeyModel(sample_props=props)
     model.save(str(OUTPUT))
     print(
